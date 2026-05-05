@@ -23,12 +23,223 @@
     window.addEventListener('resize', resize);
     resize();
 
+    // --- State ---
+    let state = 'start';
+
+    // --- Player ---
+    const player = { x: canvas.width / 2, width: 60, speed: 6 };
+    const keys = {};
+
+    // --- Clouds ---
+    let clouds = [];
+    function initClouds() {
+      clouds = [];
+      for (let i = 0; i < 4; i++) {
+        clouds.push({
+          x: Math.random() * canvas.width,
+          y: 40 + Math.random() * 180,
+          speed: 0.3 + Math.random() * 0.3
+        });
+      }
+    }
+    initClouds();
+
+    // --- Game State ---
+    let score = 0;
+    let lives = 3;
+    let speedMultiplier = 1;
+    let spawnInterval = 2000;
+    let lastSpawnTime = 0;
+    let poops = [];
+    let effects = [];
+    let scoreBounce = 0;
+    let flashTimer = 0;
+
+    // --- Helpers ---
+    function maxSimultaneous() {
+      if (score < 20) return 1;
+      if (score < 50) return 2;
+      return 3;
+    }
+
+    function updateDifficulty() {
+      speedMultiplier = 1 + Math.floor(score / 10) * 0.15;
+      spawnInterval = Math.max(500, 2000 - Math.floor(score / 10) * 200);
+    }
+
+    function collidesWithPlayer(poop) {
+      const playerTop = canvas.height - 80;
+      return (
+        poop.y + 16 >= playerTop &&
+        poop.y <= playerTop + 48 &&
+        poop.x >= player.x - player.width / 2 &&
+        poop.x <= player.x + player.width / 2
+      );
+    }
+
+    // --- Update ---
+    function updatePlayer() {
+      if (keys['ArrowLeft'] || keys['a'] || keys['A']) player.x -= player.speed;
+      if (keys['ArrowRight'] || keys['d'] || keys['D']) player.x += player.speed;
+      player.x = Math.max(player.width / 2, Math.min(canvas.width - player.width / 2, player.x));
+    }
+
+    function updateClouds() {
+      clouds.forEach(c => {
+        c.x += c.speed;
+        if (c.x > canvas.width + 60) c.x = -60;
+      });
+    }
+
+    function spawnPoop(timestamp) {
+      if (poops.length >= maxSimultaneous()) return;
+      if (timestamp - lastSpawnTime < spawnInterval) return;
+      lastSpawnTime = timestamp;
+      poops.push({
+        x: 40 + Math.random() * (canvas.width - 80),
+        y: -40,
+        speed: (3 + Math.random() * 2) * speedMultiplier
+      });
+    }
+
+    function updatePoops(timestamp) {
+      spawnPoop(timestamp);
+      poops = poops.filter(p => {
+        p.y += p.speed;
+        if (collidesWithPlayer(p)) {
+          score++;
+          scoreBounce = 1;
+          effects.push({ x: p.x, y: canvas.height - 80, timer: 300 });
+          updateDifficulty();
+          return false;
+        }
+        if (p.y >= canvas.height + 50) {
+          lives--;
+          flashTimer = 400;
+          return false;
+        }
+        return true;
+      });
+    }
+
+    function updateEffects(dt) {
+      if (scoreBounce > 0) scoreBounce = Math.max(0, scoreBounce - 0.06);
+      if (flashTimer > 0) flashTimer = Math.max(0, flashTimer - dt);
+      effects = effects.filter(e => { e.timer -= dt; return e.timer > 0; });
+      if (lives <= 0) state = 'gameover';
+    }
+
+    // --- Start / Reset ---
+    function startGame() {
+      score = 0;
+      lives = 3;
+      poops = [];
+      effects = [];
+      flashTimer = 0;
+      scoreBounce = 0;
+      speedMultiplier = 1;
+      spawnInterval = 2000;
+      lastSpawnTime = 0;
+      player.x = canvas.width / 2;
+      initClouds();
+      state = 'playing';
+    }
+
+    // --- Draw ---
+    function drawStart() {
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 64px serif';
+      ctx.fillStyle = '#fff';
+      ctx.fillText('💩 POOP CATCHER 🧻', canvas.width / 2, canvas.height / 2 - 60);
+      ctx.font = '28px serif';
+      ctx.fillStyle = '#ccc';
+      ctx.fillText('catch the poop before it hits the ground!', canvas.width / 2, canvas.height / 2);
+      ctx.font = '22px serif';
+      ctx.fillStyle = '#aaa';
+      ctx.fillText('Press any key or tap to start', canvas.width / 2, canvas.height / 2 + 60);
+    }
+
+    function drawPlaying() {
+      ctx.textAlign = 'center';
+      ctx.font = '32px serif';
+      poops.forEach(p => ctx.fillText('💩', p.x, p.y));
+      ctx.font = '48px serif';
+      ctx.fillText('🧻', player.x, canvas.height - 40);
+      ctx.font = '28px serif';
+      effects.forEach(e => ctx.fillText('💥', e.x, e.y));
+      const scale = 1 + scoreBounce * 0.5;
+      ctx.save();
+      ctx.textAlign = 'left';
+      ctx.font = `bold ${Math.round(32 * scale)}px sans-serif`;
+      ctx.fillStyle = '#fff';
+      ctx.fillText(`Score: ${score}`, 20, 50);
+      ctx.restore();
+      ctx.textAlign = 'right';
+      ctx.font = '28px serif';
+      ctx.fillText('❤️'.repeat(Math.max(0, lives)), canvas.width - 20, 50);
+    }
+
+    function drawGameover() {
+      ctx.textAlign = 'center';
+      ctx.font = 'bold 72px sans-serif';
+      ctx.fillStyle = '#ff4444';
+      ctx.fillText('GAME OVER', canvas.width / 2, canvas.height / 2 - 60);
+      ctx.font = '36px sans-serif';
+      ctx.fillStyle = '#fff';
+      ctx.fillText(`Score: ${score}`, canvas.width / 2, canvas.height / 2);
+      ctx.font = '24px sans-serif';
+      ctx.fillStyle = '#aaa';
+      ctx.fillText('Press any key or tap to play again', canvas.width / 2, canvas.height / 2 + 60);
+    }
+
     function draw() {
       ctx.fillStyle = '#1a1a2e';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
+      if (flashTimer > 0) {
+        ctx.fillStyle = `rgba(255, 0, 0, ${(flashTimer / 400) * 0.4})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+      }
+      ctx.font = '40px serif';
+      clouds.forEach(c => ctx.fillText('☁️', c.x, c.y));
+      if (state === 'start') drawStart();
+      else if (state === 'playing') drawPlaying();
+      else if (state === 'gameover') drawGameover();
     }
 
-    function loop() {
+    // --- Input ---
+    document.addEventListener('keydown', e => {
+      keys[e.key] = true;
+      if (state === 'start') startGame();
+      else if (state === 'gameover') startGame();
+    });
+    document.addEventListener('keyup', e => { keys[e.key] = false; });
+    canvas.addEventListener('mousemove', e => {
+      if (state === 'playing') player.x = e.clientX;
+    });
+    canvas.addEventListener('touchmove', e => {
+      e.preventDefault();
+      if (state === 'playing') player.x = e.touches[0].clientX;
+    }, { passive: false });
+    canvas.addEventListener('click', () => {
+      if (state === 'start') startGame();
+      else if (state === 'gameover') startGame();
+    });
+    canvas.addEventListener('touchstart', () => {
+      if (state === 'start') startGame();
+      else if (state === 'gameover') startGame();
+    });
+
+    // --- Loop ---
+    let lastTimestamp = 0;
+    function loop(timestamp) {
+      const dt = timestamp - lastTimestamp;
+      lastTimestamp = timestamp;
+      updateClouds();
+      if (state === 'playing') {
+        updatePlayer();
+        updatePoops(timestamp);
+        updateEffects(dt);
+      }
       draw();
       requestAnimationFrame(loop);
     }
