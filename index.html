@@ -52,8 +52,65 @@
     let lastSpawnTime = 0;
     let poops = [];
     let effects = [];
+    let missEffects = [];
     let scoreBounce = 0;
     let flashTimer = 0;
+
+    // --- Audio ---
+    let audioCtx = null;
+    let musicTimeout = null;
+
+    function initAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    function playNote(freq, type, duration, gain, startTime) {
+      const osc = audioCtx.createOscillator();
+      const gainNode = audioCtx.createGain();
+      osc.connect(gainNode);
+      gainNode.connect(audioCtx.destination);
+      osc.type = type;
+      osc.frequency.value = freq;
+      gainNode.gain.setValueAtTime(gain, startTime);
+      gainNode.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
+      osc.start(startTime);
+      osc.stop(startTime + duration + 0.01);
+    }
+
+    function playCatch() {
+      if (!audioCtx) return;
+      const t = audioCtx.currentTime;
+      playNote(523, 'square', 0.08, 0.3, t);
+      playNote(659, 'square', 0.08, 0.3, t + 0.08);
+    }
+
+    function playMiss() {
+      if (!audioCtx) return;
+      const t = audioCtx.currentTime;
+      playNote(392, 'square', 0.1, 0.3, t);
+      playNote(294, 'square', 0.1, 0.3, t + 0.1);
+    }
+
+    const MELODY = [523, 659, 784, 659, 523, 392, 659, 523];
+
+    function playMusic(noteIndex) {
+      if (!audioCtx) return;
+      playNote(MELODY[noteIndex], 'triangle', 0.13, 0.08, audioCtx.currentTime);
+      musicTimeout = setTimeout(() => {
+        playMusic((noteIndex + 1) % MELODY.length);
+      }, 150);
+    }
+
+    function stopMusic() {
+      clearTimeout(musicTimeout);
+      musicTimeout = null;
+    }
+
+    function startMusic() {
+      stopMusic();
+      if (!audioCtx) return;
+      playMusic(0);
+    }
 
     // --- Helpers ---
     function maxSimultaneous() {
@@ -111,10 +168,12 @@
           scoreBounce = 1;
           effects.push({ x: p.x, y: canvas.height - 80, timer: 300 });
           updateDifficulty();
+          playCatch();
           return false;
         }
         if (p.y >= canvas.height + 50) {
-          if (lives > 0) { lives--; flashTimer = 400; }
+          if (lives > 0) { lives--; flashTimer = 400; playMiss(); }
+          missEffects.push({ x: p.x, y: canvas.height - 60, timer: 400 });
           return false;
         }
         return true;
@@ -125,7 +184,8 @@
       if (scoreBounce > 0) scoreBounce = Math.max(0, scoreBounce - dt / 300);
       if (flashTimer > 0) flashTimer = Math.max(0, flashTimer - dt);
       effects = effects.filter(e => { e.timer -= dt; return e.timer > 0; });
-      if (lives <= 0) state = 'gameover';
+      missEffects = missEffects.filter(e => { e.timer -= dt; return e.timer > 0; });
+      if (lives <= 0) { stopMusic(); state = 'gameover'; }
     }
 
     // --- Start / Reset ---
@@ -134,6 +194,7 @@
       lives = 3;
       poops = [];
       effects = [];
+      missEffects = [];
       flashTimer = 0;
       scoreBounce = 0;
       speedMultiplier = 1;
@@ -142,6 +203,7 @@
       player.x = canvas.width / 2;
       initClouds();
       state = 'playing';
+      startMusic();
     }
 
     // --- Draw ---
@@ -165,7 +227,8 @@
       ctx.font = '48px serif';
       ctx.fillText('🧻', player.x, canvas.height - 40);
       ctx.font = '28px serif';
-      effects.forEach(e => ctx.fillText('💥', e.x, e.y));
+      effects.forEach(e => ctx.fillText('💧', e.x, e.y));
+      missEffects.forEach(e => ctx.fillText('💦', e.x, e.y));
       const scale = 1 + scoreBounce * 0.5;
       ctx.save();
       ctx.textAlign = 'left';
@@ -208,6 +271,7 @@
     // --- Input ---
     document.addEventListener('keydown', e => {
       keys[e.key] = true;
+      initAudio();
       if (state === 'start') startGame();
       else if (state === 'gameover') startGame();
     });
@@ -220,11 +284,13 @@
       if (state === 'playing') player.x = Math.max(player.width / 2, Math.min(canvas.width - player.width / 2, e.touches[0].clientX));
     }, { passive: false });
     canvas.addEventListener('click', () => {
+      initAudio();
       if (state === 'start') startGame();
       else if (state === 'gameover') startGame();
     });
     canvas.addEventListener('touchstart', e => {
       e.preventDefault();
+      initAudio();
       if (state === 'start') startGame();
       else if (state === 'gameover') startGame();
     });
