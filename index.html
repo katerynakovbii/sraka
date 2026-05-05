@@ -226,7 +226,8 @@
       if (state === 'start') startGame();
       else if (state === 'gameover') startGame();
     });
-    canvas.addEventListener('touchstart', () => {
+    canvas.addEventListener('touchstart', e => {
+      e.preventDefault();
       if (state === 'start') startGame();
       else if (state === 'gameover') startGame();
     });
@@ -234,6 +235,7 @@
     // --- Loop ---
     let lastTimestamp = 0;
     function loop(timestamp) {
+      if (!lastTimestamp) { lastTimestamp = timestamp; requestAnimationFrame(loop); return; }
       const dt = Math.min(timestamp - lastTimestamp, 100);
       lastTimestamp = timestamp;
       updateClouds();
