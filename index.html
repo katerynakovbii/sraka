@@ -19,9 +19,6 @@
     function resize() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
-      if (typeof player !== 'undefined') {
-        player.x = Math.max(player.width / 2, Math.min(canvas.width - player.width / 2, player.x));
-      }
     }
     window.addEventListener('resize', resize);
     resize();
