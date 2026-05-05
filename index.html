@@ -92,10 +92,7 @@
     }
 
     function spawnPoop(timestamp) {
-      if (poops.length >= maxSimultaneous()) {
-        lastSpawnTime = timestamp;
-        return;
-      }
+      if (poops.length >= maxSimultaneous()) return;
       if (timestamp - lastSpawnTime < spawnInterval) return;
       lastSpawnTime = timestamp;
       poops.push({
@@ -142,7 +139,7 @@
       scoreBounce = 0;
       speedMultiplier = 1;
       spawnInterval = 2000;
-      lastSpawnTime = 0;
+      lastSpawnTime = performance.now();
       player.x = canvas.width / 2;
       initClouds();
       state = 'playing';
