@@ -92,7 +92,10 @@
     }
 
     function spawnPoop(timestamp) {
-      if (poops.length >= maxSimultaneous()) return;
+      if (poops.length >= maxSimultaneous()) {
+        lastSpawnTime = timestamp;
+        return;
+      }
       if (timestamp - lastSpawnTime < spawnInterval) return;
       lastSpawnTime = timestamp;
       poops.push({
@@ -214,11 +217,11 @@
     });
     document.addEventListener('keyup', e => { keys[e.key] = false; });
     canvas.addEventListener('mousemove', e => {
-      if (state === 'playing') player.x = e.clientX;
+      if (state === 'playing') player.x = Math.max(player.width / 2, Math.min(canvas.width - player.width / 2, e.clientX));
     });
     canvas.addEventListener('touchmove', e => {
       e.preventDefault();
-      if (state === 'playing') player.x = e.touches[0].clientX;
+      if (state === 'playing') player.x = Math.max(player.width / 2, Math.min(canvas.width - player.width / 2, e.touches[0].clientX));
     }, { passive: false });
     canvas.addEventListener('click', () => {
       if (state === 'start') startGame();
@@ -232,7 +235,7 @@
     // --- Loop ---
     let lastTimestamp = 0;
     function loop(timestamp) {
-      const dt = timestamp - lastTimestamp;
+      const dt = Math.min(timestamp - lastTimestamp, 100);
       lastTimestamp = timestamp;
       updateClouds();
       if (state === 'playing') {
