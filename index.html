@@ -19,6 +19,9 @@
     function resize() {
       canvas.width = window.innerWidth;
       canvas.height = window.innerHeight;
+      if (typeof player !== 'undefined') {
+        player.x = Math.max(player.width / 2, Math.min(canvas.width - player.width / 2, player.x));
+      }
     }
     window.addEventListener('resize', resize);
     resize();
@@ -68,10 +71,10 @@
     }
 
     function collidesWithPlayer(poop) {
-      const playerTop = canvas.height - 80;
+      const playerTop = canvas.height - 88;
       return (
         poop.y + 16 >= playerTop &&
-        poop.y <= playerTop + 48 &&
+        poop.y <= playerTop + 56 &&
         poop.x >= player.x - player.width / 2 &&
         poop.x <= player.x + player.width / 2
       );
@@ -114,8 +117,7 @@
           return false;
         }
         if (p.y >= canvas.height + 50) {
-          lives--;
-          flashTimer = 400;
+          if (lives > 0) { lives--; flashTimer = 400; }
           return false;
         }
         return true;
@@ -123,7 +125,7 @@
     }
 
     function updateEffects(dt) {
-      if (scoreBounce > 0) scoreBounce = Math.max(0, scoreBounce - 0.06);
+      if (scoreBounce > 0) scoreBounce = Math.max(0, scoreBounce - dt / 300);
       if (flashTimer > 0) flashTimer = Math.max(0, flashTimer - dt);
       effects = effects.filter(e => { e.timer -= dt; return e.timer > 0; });
       if (lives <= 0) state = 'gameover';
