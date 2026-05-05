@@ -62,6 +62,7 @@
 
     function initAudio() {
       if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === 'suspended') audioCtx.resume();
     }
 
     function playNote(freq, type, duration, gain, startTime) {
@@ -188,7 +189,10 @@
     }
 
     // --- Start / Reset ---
+    let lastStartTime = 0;
     function startGame() {
+      if (performance.now() - lastStartTime < 200) return;
+      lastStartTime = performance.now();
       score = 0;
       lives = 3;
       poops = [];
